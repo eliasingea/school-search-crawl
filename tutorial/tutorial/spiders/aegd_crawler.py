@@ -20,7 +20,7 @@ class QuotesSpider(scrapy.Spider):
     def start_requests(self):
 
         programs = []
-        with open('/Users/eliasingea/Documents/code/AEGD-Crawl/aegd_output.csv', newline='') as csvfile:
+        with open('/home/eliasingea/school-search-crawl/programpages_1.csv', newline='') as csvfile:
             reader = csv.DictReader(csvfile)
             for row in reader:
                 programs.append(row)
@@ -65,11 +65,21 @@ class QuotesSpider(scrapy.Spider):
 
     def matchKeywords(self, text):
         keywords = set()
-        with open("/Users/eliasingea/Documents/code/AEGD-Crawl/tutorial/tutorial/keywords.txt", "r") as keywords_file:
+        with open("/home/eliasingea/school-search-crawl/tutorial/tutorial/keywords.txt", "r") as keywords_file:
             for line in keywords_file.readlines():
                 if line.strip() in text:
                     keywords.add(line.strip())
         return list(keywords)
+
+    def getProgramPagesDetails(self, response):
+        programInformation = response.xpath(
+            "//ul[@id='information']").getall()
+        returnArr = {}
+        for program in programInformation:
+            program = self.cleanUpText(program)
+            field = program.split(program, ":")
+            returnArr[field[0]] = field[1]
+        return returnArr
 
     def yeildResults(self, title, container, response):
 
@@ -77,7 +87,8 @@ class QuotesSpider(scrapy.Spider):
         title = self.cleanUpText(title)
 
         keywords = self.matchKeywords(container)
-
+        programs = self.getProgramPagesDetails(response)
+        print(programs)
         program = response.meta["program"]
         try:
             objectID = hashlib.md5(title.encode()).hexdigest() if title != "" else hashlib.md5(
@@ -91,7 +102,10 @@ class QuotesSpider(scrapy.Spider):
             "Program Name": program["Program Name"],
             "Program Type": program["Program Type"],
             "url": program["url"],
-            "keywords": keywords
+            "keywords": keywords,
+            "state": program["state"],
+            "deadline": program["deadline"],
+            **programs
         }
 
     def parseCatchAll(self, response):
@@ -112,6 +126,7 @@ class QuotesSpider(scrapy.Spider):
     #     return self.yeildResults(title, container, response)
 
     def parseProgramPages(self, response):
+        print("hello")
         active = True
         container = response.xpath("//div[@id='container']").get()
         if "Program is NOT active" in container:
