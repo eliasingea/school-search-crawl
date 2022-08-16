@@ -59,7 +59,10 @@ class QuotesSpider(scrapy.Spider):
 
     def cleanUpText(self, text):
         try:
-            return w3lib.html.remove_tags(text).strip()
+            clean = w3lib.html.remove_tags(text).strip()
+            cleaned = clean.replace("\n", "").replace(
+                "\t", "").replace("\r", "").replace("\xa0", "").strip()
+            return " ".join(cleaned.split())
         except Exception as e:
             return ""
 
@@ -72,23 +75,38 @@ class QuotesSpider(scrapy.Spider):
         return list(keywords)
 
     def getProgramPagesDetails(self, response):
+        print("in program page details")
         programInformation = response.xpath(
-            "//ul[@id='information']").getall()
-        returnArr = {}
-        for program in programInformation:
-            program = self.cleanUpText(program)
-            field = program.split(program, ":")
-            returnArr[field[0]] = field[1]
-        return returnArr
+            "//ul[@id='information']")
+        questions = programInformation.xpath("//p[normalize-space()]").getall()
+        for question in questions:
+            if "?" in self.cleanUpText(question) or ":" in self.cleanUpText(question):
+                self.cleanDetails(self.cleanUpText(question))
+      #  programClean = self.cleanUpText(programInformation).strip()
+       # returnArr.append(programClean)
+        # return returnArr
+
+    def cleanDetails(self, question):
+        responses = {}
+        list_of_questions = ["length", "start on",
+                             "program number", "match", "available positions"]
+        for q in list_of_questions:
+            if q in question:
+                if "?" in question:
+                    fields = question.split("?")
+                else:
+                    fields = question.split(":")
+                responses[q.replace(" ", "_")] = fields[1]
+                continue
 
     def yeildResults(self, title, container, response):
-
+        print("in yield")
         container = self.cleanUpText(container)
         title = self.cleanUpText(title)
 
         keywords = self.matchKeywords(container)
-        programs = self.getProgramPagesDetails(response)
-        print(programs)
+        programDetails = self.getProgramPagesDetails(response)
+        self.cleanDetails(programDetails)
         program = response.meta["program"]
         try:
             objectID = hashlib.md5(title.encode()).hexdigest() if title != "" else hashlib.md5(
@@ -105,7 +123,7 @@ class QuotesSpider(scrapy.Spider):
             "keywords": keywords,
             "state": program["state"],
             "deadline": program["deadline"],
-            **programs
+            "details": programDetails
         }
 
     def parseCatchAll(self, response):
@@ -131,12 +149,6 @@ class QuotesSpider(scrapy.Spider):
         container = response.xpath("//div[@id='container']").get()
         if "Program is NOT active" in container:
             active = False
-
+        print(active)
         title = response.xpath("//div[@align='center']/text()").get()
-        if not active:
-            yield {
-                "objectID": hashlib.md5(title.encode()).hexdigest(),
-                "title": title,
-                "active": False
-            }
         return self.yeildResults(title, container, response)
