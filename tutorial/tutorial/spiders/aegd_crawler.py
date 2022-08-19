@@ -10,6 +10,9 @@ from string import punctuation
 from spacy.matcher import Matcher
 
 import hashlib
+import os
+from config.definitions import ROOT_DIR
+
 
 nlp = spacy.load("en_core_web_sm")
 
@@ -17,10 +20,13 @@ nlp = spacy.load("en_core_web_sm")
 class QuotesSpider(scrapy.Spider):
     name = "aegd"
 
+    def get_file_name(self, path):
+        return os.path.join(ROOT_DIR, path)
+
     def start_requests(self):
 
         programs = []
-        with open('/home/eliasingea/school-search-crawl/programpages_1.csv', newline='') as csvfile:
+        with open(self.get_file_name('programpages_1.csv'), newline='') as csvfile:
             reader = csv.DictReader(csvfile)
             for row in reader:
                 programs.append(row)
@@ -68,30 +74,30 @@ class QuotesSpider(scrapy.Spider):
 
     def matchKeywords(self, text):
         keywords = set()
-        with open("/home/eliasingea/school-search-crawl/tutorial/tutorial/keywords.txt", "r") as keywords_file:
+        with open(self.get_file_name("tutorial/tutorial/keywords.txt"), "r") as keywords_file:
             for line in keywords_file.readlines():
                 if line.strip() in text:
                     keywords.add(line.strip())
         return list(keywords)
 
     def getProgramPagesDetails(self, response):
-        print("in program page details")
         programInformation = response.xpath(
             "//ul[@id='information']")
         questions = programInformation.xpath("//p[normalize-space()]").getall()
+        responses = {}
         for question in questions:
             if "?" in self.cleanUpText(question) or ":" in self.cleanUpText(question):
-                self.cleanDetails(self.cleanUpText(question))
+                self.cleanDetails(self.cleanUpText(question), responses)
+        return responses
       #  programClean = self.cleanUpText(programInformation).strip()
        # returnArr.append(programClean)
         # return returnArr
 
-    def cleanDetails(self, question):
-        responses = {}
+    def cleanDetails(self, question, responses):
         list_of_questions = ["length", "start on",
-                             "program number", "match", "available positions"]
+                             "program number", "match", "available positions", "email", "phone"]
         for q in list_of_questions:
-            if q in question:
+            if q in question.lower():
                 if "?" in question:
                     fields = question.split("?")
                 else:
@@ -100,13 +106,11 @@ class QuotesSpider(scrapy.Spider):
                 continue
 
     def yeildResults(self, title, container, response):
-        print("in yield")
         container = self.cleanUpText(container)
         title = self.cleanUpText(title)
 
         keywords = self.matchKeywords(container)
         programDetails = self.getProgramPagesDetails(response)
-        self.cleanDetails(programDetails)
         program = response.meta["program"]
         try:
             objectID = hashlib.md5(title.encode()).hexdigest() if title != "" else hashlib.md5(
@@ -123,7 +127,7 @@ class QuotesSpider(scrapy.Spider):
             "keywords": keywords,
             "state": program["state"],
             "deadline": program["deadline"],
-            "details": programDetails
+            **programDetails
         }
 
     def parseCatchAll(self, response):
@@ -144,11 +148,9 @@ class QuotesSpider(scrapy.Spider):
     #     return self.yeildResults(title, container, response)
 
     def parseProgramPages(self, response):
-        print("hello")
         active = True
         container = response.xpath("//div[@id='container']").get()
         if "Program is NOT active" in container:
             active = False
-        print(active)
         title = response.xpath("//div[@align='center']/text()").get()
         return self.yeildResults(title, container, response)
