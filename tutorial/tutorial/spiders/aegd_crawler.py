@@ -26,7 +26,7 @@ class QuotesSpider(scrapy.Spider):
     def start_requests(self):
 
         programs = []
-        with open(self.get_file_name('programpages_1.csv'), newline='') as csvfile:
+        with open(self.get_file_name('aegd_output.csv'), newline='') as csvfile:
             reader = csv.DictReader(csvfile)
             for row in reader:
                 programs.append(row)
@@ -110,7 +110,7 @@ class QuotesSpider(scrapy.Spider):
         title = self.cleanUpText(title)
 
         keywords = self.matchKeywords(container)
-        programDetails = self.getProgramPagesDetails(response)
+        #programDetails = self.getProgramPagesDetails(response)
         program = response.meta["program"]
         try:
             objectID = hashlib.md5(title.encode()).hexdigest() if title != "" else hashlib.md5(
@@ -125,9 +125,6 @@ class QuotesSpider(scrapy.Spider):
             "Program Type": program["Program Type"],
             "url": program["url"],
             "keywords": keywords,
-            "state": program["state"],
-            "deadline": program["deadline"],
-            **programDetails
         }
 
     def parseCatchAll(self, response):
