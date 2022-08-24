@@ -20,7 +20,7 @@ class QuotesSpider(scrapy.Spider):
     def start_requests(self):
 
         programs = []
-        with open('/Users/eliasingea/Documents/code/AEGD-Crawl/aegd_output.csv', newline='') as csvfile:
+        with open('/Users/eliasingea/Documents/code/AEGD-Crawl/programpages.csv', newline='') as csvfile:
             reader = csv.DictReader(csvfile)
             for row in reader:
                 programs.append(row)
@@ -91,7 +91,9 @@ class QuotesSpider(scrapy.Spider):
             "Program Name": program["Program Name"],
             "Program Type": program["Program Type"],
             "url": program["url"],
-            "keywords": keywords
+            "keywords": keywords,
+            "state": program["state"],
+            "deadline": program["deadline"]
         }
 
     def parseCatchAll(self, response):
@@ -122,6 +124,6 @@ class QuotesSpider(scrapy.Spider):
             yield {
                 "objectID": hashlib.md5(title.encode()).hexdigest(),
                 "title": title,
-                "active": False
+                "active": False,
             }
         return self.yeildResults(title, container, response)

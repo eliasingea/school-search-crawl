@@ -1,3 +1,5 @@
 .vscode
 .ipynb_checkpoints
 *.json
+.DS_Store
+*.cpython
