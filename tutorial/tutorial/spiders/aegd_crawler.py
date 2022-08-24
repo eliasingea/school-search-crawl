@@ -1,3 +1,4 @@
+from tokenize import group
 import scrapy
 
 import w3lib.html
@@ -12,7 +13,7 @@ from spacy.matcher import Matcher
 import hashlib
 import os
 from config.definitions import ROOT_DIR
-
+import re
 
 nlp = spacy.load("en_core_web_sm")
 
@@ -112,6 +113,37 @@ class QuotesSpider(scrapy.Spider):
         keywords = self.matchKeywords(container)
         programDetails = self.getProgramPagesDetails(response)
         program = response.meta["program"]
+        programName = program["Program Name"]
+        duration = 12
+        regex = r"(\d+)\s(months|years)"
+
+        if "Program Type" in program:
+            matches = re.search(regex, program("Program Type"))
+            if matches:
+                if len(matches.groups()) > 1:
+                    if matches.group(2) == "months":
+                        duration = matches.group(1)
+                    elif matches.group(2) == "years":
+                        duration = matches.group(1) * 12
+            if "Advanced Education in General Dentistry" in program["Program Type"]:
+                programName = "AEGD"
+            elif "Oral and Maxillofacial Surgery" in program["Program Type"]:
+                programName = "OMS"
+            elif "General Practice Residency" in program["Program Type"]:
+                programName = "GPR"
+
+        if program["Program Name"] == "NA":
+            programName = program["title"].split("-")[0].strip()
+
+        if "match" in programDetails:
+            if "Yes" not in programDetails["match"] and "No" not in programDetails["match"]:
+                programDetails["match"] = "No"
+
+        if "length" in programDetails:
+            if "months" not in programDetails and "year" not in programDetails and "years" not in programDetails:
+                programDetails["length"] = "12 months"
+            if programDetails["length"].strip() == "1 year":
+                programDetails["length"] = "12 months"
         try:
             objectID = hashlib.md5(title.encode()).hexdigest() if title != "" else hashlib.md5(
                 program["Program Name"].encode()).hexdigest()
@@ -121,7 +153,7 @@ class QuotesSpider(scrapy.Spider):
             "objectID": objectID,
             "active": True,
             "title": title,
-            "Program Name": program["Program Name"],
+            "program": programName,
             "Program Type": program["Program Type"],
             "url": program["url"],
             "keywords": keywords,
@@ -154,3 +186,4 @@ class QuotesSpider(scrapy.Spider):
             active = False
         title = response.xpath("//div[@align='center']/text()").get()
         return self.yeildResults(title, container, response)
+
