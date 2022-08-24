@@ -10,6 +10,9 @@ from string import punctuation
 from spacy.matcher import Matcher
 
 import hashlib
+import os
+from config.definitions import ROOT_DIR
+
 
 nlp = spacy.load("en_core_web_sm")
 
@@ -17,10 +20,13 @@ nlp = spacy.load("en_core_web_sm")
 class QuotesSpider(scrapy.Spider):
     name = "aegd"
 
+    def get_file_name(self, path):
+        return os.path.join(ROOT_DIR, path)
+
     def start_requests(self):
 
         programs = []
-        with open('/Users/eliasingea/Documents/code/AEGD-Crawl/programpages.csv', newline='') as csvfile:
+        with open(self.get_file_name('programpages_1.csv'), newline='') as csvfile:
             reader = csv.DictReader(csvfile)
             for row in reader:
                 programs.append(row)
@@ -59,25 +65,52 @@ class QuotesSpider(scrapy.Spider):
 
     def cleanUpText(self, text):
         try:
-            return w3lib.html.remove_tags(text).strip()
+            clean = w3lib.html.remove_tags(text).strip()
+            cleaned = clean.replace("\n", "").replace(
+                "\t", "").replace("\r", "").replace("\xa0", "").strip()
+            return " ".join(cleaned.split())
         except Exception as e:
             return ""
 
     def matchKeywords(self, text):
         keywords = set()
-        with open("/Users/eliasingea/Documents/code/AEGD-Crawl/tutorial/tutorial/keywords.txt", "r") as keywords_file:
+        with open(self.get_file_name("tutorial/tutorial/keywords.txt"), "r") as keywords_file:
             for line in keywords_file.readlines():
                 if line.strip() in text:
                     keywords.add(line.strip())
         return list(keywords)
 
-    def yeildResults(self, title, container, response):
+    def getProgramPagesDetails(self, response):
+        programInformation = response.xpath(
+            "//ul[@id='information']")
+        questions = programInformation.xpath("//p[normalize-space()]").getall()
+        responses = {}
+        for question in questions:
+            if "?" in self.cleanUpText(question) or ":" in self.cleanUpText(question):
+                self.cleanDetails(self.cleanUpText(question), responses)
+        return responses
+      #  programClean = self.cleanUpText(programInformation).strip()
+       # returnArr.append(programClean)
+        # return returnArr
 
+    def cleanDetails(self, question, responses):
+        list_of_questions = ["length", "start on",
+                             "program number", "match", "available positions", "email", "phone"]
+        for q in list_of_questions:
+            if q in question.lower():
+                if "?" in question:
+                    fields = question.split("?")
+                else:
+                    fields = question.split(":")
+                responses[q.replace(" ", "_")] = fields[1]
+                continue
+
+    def yeildResults(self, title, container, response):
         container = self.cleanUpText(container)
         title = self.cleanUpText(title)
 
         keywords = self.matchKeywords(container)
-
+        programDetails = self.getProgramPagesDetails(response)
         program = response.meta["program"]
         try:
             objectID = hashlib.md5(title.encode()).hexdigest() if title != "" else hashlib.md5(
@@ -93,7 +126,8 @@ class QuotesSpider(scrapy.Spider):
             "url": program["url"],
             "keywords": keywords,
             "state": program["state"],
-            "deadline": program["deadline"]
+            "deadline": program["deadline"],
+            **programDetails
         }
 
     def parseCatchAll(self, response):
@@ -118,12 +152,5 @@ class QuotesSpider(scrapy.Spider):
         container = response.xpath("//div[@id='container']").get()
         if "Program is NOT active" in container:
             active = False
-
         title = response.xpath("//div[@align='center']/text()").get()
-        if not active:
-            yield {
-                "objectID": hashlib.md5(title.encode()).hexdigest(),
-                "title": title,
-                "active": False,
-            }
         return self.yeildResults(title, container, response)

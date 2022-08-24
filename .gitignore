@@ -3,3 +3,6 @@
 *.json
 .DS_Store
 *.cpython
+env/
+*.json
+__pycache__
