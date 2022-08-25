@@ -122,9 +122,9 @@ class QuotesSpider(scrapy.Spider):
             if matches:
                 if len(matches.groups()) > 1:
                     if matches.group(2) == "months":
-                        duration = str(matches.group(1)) + " months"
+                        length = str(matches.group(1)) + " months"
                     elif matches.group(2) == "years":
-                        duration = str(matches.group(1) * 12) + " months"
+                        length = str(matches.group(1) * 12) + " months"
             if "Advanced Education in General Dentistry" in program["Program Type"]:
                 programName = "AEGD"
             elif "Oral and Maxillofacial Surgery" in program["Program Type"]:
@@ -146,9 +146,9 @@ class QuotesSpider(scrapy.Spider):
                 programDetails["length"] = "12 months"
 
         if programDetails and "length" in programDetails:
-            duration = programDetails["length"]
+            length = programDetails["length"]
         else:
-            programDetails["length"] = duration
+            programDetails["length"] = length
         try:
             objectID = hashlib.md5(title.encode()).hexdigest() if title != "" else hashlib.md5(
                 program["Program Name"].encode()).hexdigest()
