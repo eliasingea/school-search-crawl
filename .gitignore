@@ -1,3 +1,9 @@
+.vscode
+.ipynb_checkpoints
+*.json
+.DS_Store
+*.cpython
 env/
 *.json
 __pycache__
+*.DS_Store

@@ -1,3 +1,4 @@
+from tokenize import group
 import scrapy
 
 import w3lib.html
@@ -12,7 +13,7 @@ from spacy.matcher import Matcher
 import hashlib
 import os
 from config.definitions import ROOT_DIR
-
+import re
 
 nlp = spacy.load("en_core_web_sm")
 
@@ -26,7 +27,7 @@ class QuotesSpider(scrapy.Spider):
     def start_requests(self):
 
         programs = []
-        with open(self.get_file_name('aegd_output.csv'), newline='') as csvfile:
+        with open(self.get_file_name('programpages_1.csv'), newline='') as csvfile:
             reader = csv.DictReader(csvfile)
             for row in reader:
                 programs.append(row)
@@ -108,10 +109,46 @@ class QuotesSpider(scrapy.Spider):
     def yeildResults(self, title, container, response):
         container = self.cleanUpText(container)
         title = self.cleanUpText(title)
-
         keywords = self.matchKeywords(container)
-        #programDetails = self.getProgramPagesDetails(response)
+        programDetails = {}
+        programDetails = self.getProgramPagesDetails(response)
         program = response.meta["program"]
+        programName = program["Program Name"]
+        length = "12 months"
+        regex = r"(\d+)\s(months|years)"
+
+        if "Program Type" in program:
+            matches = re.search(regex, program["Program Type"])
+            if matches:
+                if len(matches.groups()) > 1:
+                    if matches.group(2) == "months":
+                        duration = str(matches.group(1)) + " months"
+                    elif matches.group(2) == "years":
+                        duration = str(matches.group(1) * 12) + " months"
+            if "Advanced Education in General Dentistry" in program["Program Type"]:
+                programName = "AEGD"
+            elif "Oral and Maxillofacial Surgery" in program["Program Type"]:
+                programName = "OMS"
+            elif "General Practice Residency" in program["Program Type"]:
+                programName = "GPR"
+
+        if program["Program Name"] == "NA":
+            programName = program["title"].split("-")[0].strip()
+
+        if "match" in programDetails:
+            if "Yes" not in programDetails["match"] and "No" not in programDetails["match"]:
+                programDetails["match"] = "No"
+
+        if "length" in programDetails:
+            if "months" not in programDetails["length"] and "year" not in programDetails["length"] and "years" not in programDetails["length"]:
+                programDetails["length"] = "12 months"
+            if "1 year" in programDetails["length"].strip():
+                programDetails["length"] = "12 months"
+
+        if programDetails and "length" in programDetails:
+            duration = programDetails["length"]
+        else:
+            programDetails["length"] = duration
         try:
             objectID = hashlib.md5(title.encode()).hexdigest() if title != "" else hashlib.md5(
                 program["Program Name"].encode()).hexdigest()
@@ -121,28 +158,19 @@ class QuotesSpider(scrapy.Spider):
             "objectID": objectID,
             "active": True,
             "title": title,
-            "Program Name": program["Program Name"],
+            "program": programName,
             "Program Type": program["Program Type"],
             "url": program["url"],
             "keywords": keywords,
+            "state": program["state"],
+            "deadline": program["deadline"],
+            **programDetails
         }
 
     def parseCatchAll(self, response):
         container = "\n".join(response.xpath("//body").getall())
         title = response.xpath("//head/title/text()").get()
         return self.yeildResults(title, container, response)
-
-    # def parseUCLA(self, response):
-    #     title = response.xpath("//head/title/text()").get()
-    #     container = "\n".join(response.xpath(
-    #         "//div[@id='block-dentistry-content']//p").getall())
-    #     return self.yeildResults(title, container, response)
-
-    # def parseUNC(self, response):
-    #     container = "\n".join(response.xpath(
-    #         "//article[@class='chapters-container']//p").getall())
-    #     title = response.xpath("//head/title/text()").get()
-    #     return self.yeildResults(title, container, response)
 
     def parseProgramPages(self, response):
         active = True
