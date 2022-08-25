@@ -109,22 +109,22 @@ class QuotesSpider(scrapy.Spider):
     def yeildResults(self, title, container, response):
         container = self.cleanUpText(container)
         title = self.cleanUpText(title)
-
         keywords = self.matchKeywords(container)
+        programDetails = {}
         programDetails = self.getProgramPagesDetails(response)
         program = response.meta["program"]
         programName = program["Program Name"]
-        duration = 12
+        length = "12 months"
         regex = r"(\d+)\s(months|years)"
 
         if "Program Type" in program:
-            matches = re.search(regex, program("Program Type"))
+            matches = re.search(regex, program["Program Type"])
             if matches:
                 if len(matches.groups()) > 1:
                     if matches.group(2) == "months":
-                        duration = matches.group(1)
+                        duration = str(matches.group(1)) + " months"
                     elif matches.group(2) == "years":
-                        duration = matches.group(1) * 12
+                        duration = str(matches.group(1) * 12) + " months"
             if "Advanced Education in General Dentistry" in program["Program Type"]:
                 programName = "AEGD"
             elif "Oral and Maxillofacial Surgery" in program["Program Type"]:
@@ -140,10 +140,15 @@ class QuotesSpider(scrapy.Spider):
                 programDetails["match"] = "No"
 
         if "length" in programDetails:
-            if "months" not in programDetails and "year" not in programDetails and "years" not in programDetails:
+            if "months" not in programDetails["length"] and "year" not in programDetails["length"] and "years" not in programDetails["length"]:
                 programDetails["length"] = "12 months"
-            if programDetails["length"].strip() == "1 year":
+            if "1 year" in programDetails["length"].strip():
                 programDetails["length"] = "12 months"
+
+        if programDetails and "length" in programDetails:
+            duration = programDetails["length"]
+        else:
+            programDetails["length"] = duration
         try:
             objectID = hashlib.md5(title.encode()).hexdigest() if title != "" else hashlib.md5(
                 program["Program Name"].encode()).hexdigest()
@@ -167,18 +172,6 @@ class QuotesSpider(scrapy.Spider):
         title = response.xpath("//head/title/text()").get()
         return self.yeildResults(title, container, response)
 
-    # def parseUCLA(self, response):
-    #     title = response.xpath("//head/title/text()").get()
-    #     container = "\n".join(response.xpath(
-    #         "//div[@id='block-dentistry-content']//p").getall())
-    #     return self.yeildResults(title, container, response)
-
-    # def parseUNC(self, response):
-    #     container = "\n".join(response.xpath(
-    #         "//article[@class='chapters-container']//p").getall())
-    #     title = response.xpath("//head/title/text()").get()
-    #     return self.yeildResults(title, container, response)
-
     def parseProgramPages(self, response):
         active = True
         container = response.xpath("//div[@id='container']").get()
@@ -186,4 +179,3 @@ class QuotesSpider(scrapy.Spider):
             active = False
         title = response.xpath("//div[@align='center']/text()").get()
         return self.yeildResults(title, container, response)
-
