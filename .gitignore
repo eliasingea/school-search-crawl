@@ -7,3 +7,5 @@ env/
 *.json
 __pycache__
 *.DS_Store
+tutorial/tutorial/__pycache__
+tutorial/tutorial/spiders/__pycache__

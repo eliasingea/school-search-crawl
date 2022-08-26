@@ -113,7 +113,7 @@ class QuotesSpider(scrapy.Spider):
         programDetails = {}
         programDetails = self.getProgramPagesDetails(response)
         program = response.meta["program"]
-        programName = program["Program Name"]
+        programName = program["Program Type"]
         length = "12 months"
         regex = r"(\d+)\s(months|years)"
 
@@ -133,10 +133,13 @@ class QuotesSpider(scrapy.Spider):
                 programName = "GPR"
 
         if program["Program Name"] == "NA":
-            programName = program["title"].split("-")[0].strip()
+            program["Program Name"] = program["title"].split("-")[0].strip()
+
+        if programName == "#REF!":
+            programName = program["title"].split("/")[1].strip()
 
         if "match" in programDetails:
-            if "Yes" not in programDetails["match"] and "No" not in programDetails["match"]:
+            if programDetails["match"] != "Yes" and programDetails["match"] != "No":
                 programDetails["match"] = "No"
 
         if "length" in programDetails:
@@ -149,6 +152,19 @@ class QuotesSpider(scrapy.Spider):
             length = programDetails["length"]
         else:
             programDetails["length"] = length
+
+        if "months months" in programDetails["length"]:
+            programDetails["length"] = programDetails["length"].replace(
+                "month", "", 1)
+        elif "optional 24" in programDetails["length"]:
+            programDetails["length"] = "12-24 months"
+        elif "2nd year" in programDetails["length"]:
+            programDetails["length"] = "12-24 months"
+        elif "years" in programDetails["length"]:
+            lenSplit = programDetails["length"].split()
+            year = int(lenSplit[0])
+            month = year * 12
+            programDetails["length"] = str(month) + " months"
         try:
             objectID = hashlib.md5(title.encode()).hexdigest() if title != "" else hashlib.md5(
                 program["Program Name"].encode()).hexdigest()
